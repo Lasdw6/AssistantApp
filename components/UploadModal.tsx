@@ -11,7 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { assistantAPI, DocumentInput } from '../services/api';
+import { assistantAPI, DocumentInput, IngestResponse, BatchIngestResponse } from '../services/api';
 
 interface UploadModalProps {
   visible: boolean;
@@ -75,21 +75,98 @@ export default function UploadModal({ visible, onClose, onUploadSuccess }: Uploa
     ));
   };
 
-  const readDocumentContent = async (document: SelectedDocument): Promise<string> => {
+  const readDocumentContent = async (document: SelectedDocument): Promise<{text: string, binaryData?: string}> => {
     try {
+      // For PDF files, read as binary data
+      if (document.mimeType === 'application/pdf') {
+        console.log(`Reading PDF: ${document.name}, Size: ${document.size} bytes`);
+        
+        try {
+          const response = await fetch(document.uri);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const arrayBuffer = await response.arrayBuffer();
+          console.log(`PDF ArrayBuffer loaded: ${arrayBuffer.byteLength} bytes`);
+          
+          // Check if the PDF is too large for processing
+          if (arrayBuffer.byteLength > 10 * 1024 * 1024) { // 10MB limit
+            console.warn(`PDF file is large (${Math.round(arrayBuffer.byteLength / 1024 / 1024)}MB), this may take time`);
+          }
+          
+          // Convert ArrayBuffer to base64 using a more robust method
+          let base64: string;
+          try {
+            // Method 1: Direct conversion (works for smaller files)
+            const uint8Array = new Uint8Array(arrayBuffer);
+            base64 = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+          } catch (btoa_error) {
+            console.log('Direct btoa failed, trying chunked approach...', btoa_error);
+            
+            // Method 2: Chunked conversion for large files
+            const uint8Array = new Uint8Array(arrayBuffer);
+            const chunkSize = 8192;
+            let base64Parts: string[] = [];
+            
+            for (let i = 0; i < uint8Array.length; i += chunkSize) {
+              const chunk = uint8Array.slice(i, i + chunkSize);
+              const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
+              base64Parts.push(btoa(chunkString));
+            }
+            
+            base64 = base64Parts.join('');
+          }
+          
+          console.log(`PDF converted to base64: ${base64.length} characters`);
+          
+          return {
+            text: `PDF Document: ${document.name}`, // Placeholder text
+            binaryData: base64
+          };
+          
+        } catch (pdfError: unknown) {
+          console.error('PDF processing error:', pdfError);
+          const errorMessage = pdfError instanceof Error ? pdfError.message : 'Unknown PDF processing error';
+          throw new Error(`Failed to process PDF: ${errorMessage}`);
+        }
+      }
+      
       // For text files, read content directly
       if (document.mimeType === 'text/plain' || document.mimeType === 'text/markdown' || document.mimeType === 'text/csv') {
-        const response = await fetch(document.uri);
-        const text = await response.text();
-        return text;
+        try {
+          const response = await fetch(document.uri);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const text = await response.text();
+          return { text };
+        } catch (textError: unknown) {
+          console.error('Text file processing error:', textError);
+          const errorMessage = textError instanceof Error ? textError.message : 'Unknown text file error';
+          throw new Error(`Failed to read text file: ${errorMessage}`);
+        }
       }
       
       // For other file types, return filename as content for now
-      // In a real app, you'd implement proper file parsing
-      return `Document: ${document.name}\nType: ${document.mimeType}\nSize: ${(document.size / 1024).toFixed(2)} KB`;
+      return {
+        text: `Document: ${document.name}\nType: ${document.mimeType}\nSize: ${(document.size / 1024).toFixed(2)} KB`
+      };
     } catch (error) {
       console.error('Error reading document:', error);
-      return `Failed to read content from ${document.name}`;
+      
+      // More specific error message
+      let errorMessage = `Failed to read content from ${document.name}`;
+      if (error instanceof Error) {
+        errorMessage += `: ${error.message}`;
+      }
+      
+      return {
+        text: errorMessage
+      };
     }
   };
 
@@ -112,8 +189,8 @@ export default function UploadModal({ visible, onClose, onUploadSuccess }: Uploa
         
         const content = await readDocumentContent(doc);
         
-        documentsToUpload.push({
-          text: content,
+        const documentInput: DocumentInput = {
+          text: content.text,
           metadata: {
             filename: doc.name,
             mimeType: doc.mimeType,
@@ -121,24 +198,101 @@ export default function UploadModal({ visible, onClose, onUploadSuccess }: Uploa
             uploadedAt: new Date().toISOString(),
             ...doc.metadata,
           },
-        });
+        };
+        
+        // Add binary data for PDFs
+        if (content.binaryData) {
+          documentInput.binary_data = content.binaryData;
+        }
+        
+        documentsToUpload.push(documentInput);
       }
 
       setUploadProgress('Uploading to API...');
 
       // Upload documents
+      let response: IngestResponse | BatchIngestResponse;
       if (documentsToUpload.length === 1) {
-        await assistantAPI.ingestDocument(documentsToUpload[0]);
+        response = await assistantAPI.ingestDocument(documentsToUpload[0]);
       } else {
-        await assistantAPI.ingestDocuments(documentsToUpload);
+        response = await assistantAPI.ingestDocuments(documentsToUpload);
       }
 
       setUploadProgress('Upload completed!');
       
+      // Create detailed success message based on API response
+      let successMessage = `Successfully uploaded ${documentsToUpload.length} document(s) to the knowledge base.`;
+      
+      // Handle single document response
+      if (documentsToUpload.length === 1 && 'document_info' in response) {
+        const singleResponse = response as IngestResponse;
+        const info = singleResponse.document_info;
+        successMessage += `\n\nDocument Analysis:`;
+        successMessage += `\n• Type: ${info.type}`;
+        successMessage += `\n• Words: ${info.word_count}`;
+        successMessage += `\n• Language: ${info.language}`;
+        successMessage += `\n• Content: ${info.content_type}`;
+        
+        // Add PDF-specific information
+        if (info.type === 'pdf') {
+          if (info.page_count) {
+            successMessage += `\n• Pages: ${info.page_count}`;
+          }
+          if (info.extraction_method) {
+            successMessage += `\n• Extraction: ${info.extraction_method}`;
+          }
+          if (info.text_extraction_quality) {
+            successMessage += `\n• Quality: ${info.text_extraction_quality}`;
+          }
+        }
+        
+        if (info.key_phrases && info.key_phrases.length > 0) {
+          successMessage += `\n• Key phrases: ${info.key_phrases.join(', ')}`;
+        }
+        
+        // Add Google Drive information
+        if (singleResponse.google_drive) {
+          const driveInfo = singleResponse.google_drive;
+          successMessage += `\n\n📁 Google Drive:`;
+          successMessage += `\n• File uploaded successfully`;
+          successMessage += `\n• Size: ${(driveInfo.size / 1024).toFixed(1)} KB`;
+          successMessage += `\n• View: Available in Google Drive`;
+        }
+      } 
+      // Handle batch response
+      else if (documentsToUpload.length > 1 && 'batch_info' in response) {
+        const batchResponse = response as BatchIngestResponse;
+        const info = batchResponse.batch_info;
+        successMessage += `\n\nBatch Analysis:`;
+        successMessage += `\n• Total words: ${info.total_words}`;
+        successMessage += `\n• Document types: ${Object.entries(info.document_types).map(([type, count]) => `${type} (${count})`).join(', ')}`;
+        
+        // Add Google Drive batch information
+        if (info.uploaded_to_drive !== undefined) {
+          successMessage += `\n\n📁 Google Drive:`;
+          successMessage += `\n• ${info.uploaded_to_drive}/${info.total_documents} files uploaded`;
+          if (info.uploaded_to_drive > 0) {
+            successMessage += `\n• Files available in Google Drive`;
+          }
+        }
+      }
+      
+      // Determine if we have a Google Drive link for single file
+      const hasGoogleDriveLink = documentsToUpload.length === 1 && 'document_info' in response && 'google_drive' in response && response.google_drive;
+      
       Alert.alert(
         'Upload Successful',
-        `Successfully uploaded ${documentsToUpload.length} document(s) to the knowledge base.`,
+        successMessage,
         [
+          // Add option to view in Google Drive if available
+          ...(hasGoogleDriveLink ? [{
+            text: 'View in Drive',
+            onPress: () => {
+              const singleResponse = response as IngestResponse;
+              console.log('Opening Google Drive:', singleResponse.google_drive?.view_link);
+              // Note: You might want to use Linking.openURL(singleResponse.google_drive.view_link) here
+            },
+          }] : []),
           {
             text: 'OK',
             onPress: () => {

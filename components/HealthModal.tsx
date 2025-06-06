@@ -153,14 +153,29 @@ export default function HealthModal({ visible, onClose }: HealthModalProps) {
                   
                   <View style={styles.serviceDetails}>
                     <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Total Documents:</Text>
+                      <Text style={styles.detailValue}>
+                        {healthData.pinecone.total_documents}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Available Indexes:</Text>
                       <Text style={styles.detailValue}>
-                        {healthData.pinecone.indexes.length}
+                        {healthData.pinecone.index_count}
                       </Text>
                     </View>
                     {healthData.pinecone.indexes.map((index, i) => (
                       <View key={i} style={styles.indexItem}>
-                        <Text style={styles.indexName}>• {index}</Text>
+                        <View style={styles.indexRow}>
+                          <Text style={styles.indexName}>• {index.name}</Text>
+                          <View style={styles.indexStats}>
+                            <Text style={styles.indexCount}>{index.document_count} docs</Text>
+                            <View style={[
+                              styles.indexStatus,
+                              { backgroundColor: getStatusColor(index.status) }
+                            ]} />
+                          </View>
+                        </View>
                       </View>
                     ))}
                   </View>
@@ -217,8 +232,8 @@ export default function HealthModal({ visible, onClose }: HealthModalProps) {
                     <Text style={styles.statLabel}>Session</Text>
                   </View>
                   <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{healthData.pinecone.indexes.length}</Text>
-                    <Text style={styles.statLabel}>Indexes</Text>
+                    <Text style={styles.statValue}>{healthData.pinecone.total_documents}</Text>
+                    <Text style={styles.statLabel}>Documents</Text>
                   </View>
                 </View>
               </View>
@@ -365,10 +380,29 @@ const styles = StyleSheet.create({
   indexItem: {
     marginTop: 4,
   },
+  indexRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   indexName: {
     fontSize: 12,
     color: '#666',
     fontFamily: 'monospace',
+  },
+  indexStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  indexCount: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  indexStatus: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginLeft: 4,
   },
   statsGrid: {
     flexDirection: 'row',
