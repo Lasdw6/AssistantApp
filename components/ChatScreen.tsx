@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
+import HealthModal from './HealthModal';
 
 interface Message {
   id: string;
@@ -27,6 +28,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [healthModalVisible, setHealthModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -49,6 +51,21 @@ export default function ChatScreen() {
       Alert.alert(
         'Connection Error',
         'Unable to connect to the Assistant API. Please check if the server is running.'
+      );
+    }
+  };
+
+  const handleStatusIndicatorPress = () => {
+    if (isConnected) {
+      setHealthModalVisible(true);
+    } else {
+      Alert.alert(
+        'Connection Status',
+        'API is currently disconnected. Please check your server and network connection.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry', onPress: checkAPIHealth }
+        ]
       );
     }
   };
@@ -131,10 +148,19 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Personal Assistant</Text>
-        <View style={[
-          styles.statusIndicator,
-          { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-        ]} />
+        <TouchableOpacity
+          onPress={handleStatusIndicatorPress}
+          style={styles.statusContainer}
+          activeOpacity={0.7}
+        >
+          <View style={[
+            styles.statusIndicator,
+            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+          ]} />
+          <Text style={styles.statusText}>
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
@@ -150,6 +176,9 @@ export default function ChatScreen() {
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeText}>
                 Welcome! I'm your personal assistant. How can I help you today?
+              </Text>
+              <Text style={styles.welcomeSubtext}>
+                Tap the status indicator above for system health details.
               </Text>
             </View>
           )}
@@ -189,6 +218,11 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <HealthModal
+        visible={healthModalVisible}
+        onClose={() => setHealthModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -213,10 +247,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#f8f8f8',
+  },
   statusIndicator: {
     width: 12,
     height: 12,
     borderRadius: 6,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666',
   },
   chatContainer: {
     flex: 1,
@@ -236,6 +284,13 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  welcomeSubtext: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   messageContainer: {
     marginVertical: 8,
