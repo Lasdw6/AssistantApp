@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
 import HealthModal from './HealthModal';
+import UploadModal from './UploadModal';
 
 interface Message {
   id: string;
@@ -29,6 +30,7 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [healthModalVisible, setHealthModalVisible] = useState(false);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -68,6 +70,14 @@ export default function ChatScreen() {
         ]
       );
     }
+  };
+
+  const handleUploadSuccess = () => {
+    // Show success message and optionally refresh something
+    Alert.alert(
+      'Upload Complete',
+      'Documents have been added to the knowledge base. You can now ask questions about them!'
+    );
   };
 
   const sendMessage = async () => {
@@ -148,19 +158,30 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Personal Assistant</Text>
-        <TouchableOpacity
-          onPress={handleStatusIndicatorPress}
-          style={styles.statusContainer}
-          activeOpacity={0.7}
-        >
-          <View style={[
-            styles.statusIndicator,
-            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-          ]} />
-          <Text style={styles.statusText}>
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </Text>
-        </TouchableOpacity>
+        
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => setUploadModalVisible(true)}
+            style={styles.uploadButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.uploadButtonText}>📄</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={handleStatusIndicatorPress}
+            style={styles.statusContainer}
+            activeOpacity={0.7}
+          >
+            <View style={[
+              styles.statusIndicator,
+              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+            ]} />
+            <Text style={styles.statusText}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -178,7 +199,7 @@ export default function ChatScreen() {
                 Welcome! I'm your personal assistant. How can I help you today?
               </Text>
               <Text style={styles.welcomeSubtext}>
-                Tap the status indicator above for system health details.
+                Tap the status indicator above for system health details, or the document icon to upload files.
               </Text>
             </View>
           )}
@@ -223,6 +244,12 @@ export default function ChatScreen() {
         visible={healthModalVisible}
         onClose={() => setHealthModalVisible(false)}
       />
+
+      <UploadModal
+        visible={uploadModalVisible}
+        onClose={() => setUploadModalVisible(false)}
+        onUploadSuccess={handleUploadSuccess}
+      />
     </SafeAreaView>
   );
 }
@@ -246,6 +273,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  uploadButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f8f8f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  uploadButtonText: {
+    fontSize: 16,
   },
   statusContainer: {
     flexDirection: 'row',
