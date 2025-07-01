@@ -101,7 +101,18 @@ class AssistantAPI {
 
   constructor() {
     // Get API URL from Expo config or fallback to localhost
-    this.baseURL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
+    const configuredUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
+    
+    // For web development, try to detect the correct URL
+    if (Constants.platform?.web) {
+      // Try to use the direct URL - this should work if the backend has CORS enabled
+      this.baseURL = configuredUrl;
+    } else {
+      this.baseURL = configuredUrl;
+    }
+    
+    console.log('API Base URL:', this.baseURL);
+    console.log('Platform:', Constants.platform);
     
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -110,14 +121,97 @@ class AssistantAPI {
         'Content-Type': 'application/json',
       },
     });
+
+    // Add request interceptor for debugging
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log('Making API request to:', (config.baseURL || '') + (config.url || ''));
+        return config;
+      },
+      (error) => {
+        console.error('Request interceptor error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Add response interceptor for debugging
+    this.client.interceptors.response.use(
+      (response) => {
+        console.log('API response received:', response.status);
+        return response;
+      },
+      (error) => {
+        console.error('API Error Details:', {
+          message: error.message,
+          code: error.code,
+          config: {
+            url: error.config?.url,
+            baseURL: error.config?.baseURL,
+            method: error.config?.method
+          },
+          response: error.response ? {
+            status: error.response.status,
+            statusText: error.response.statusText,
+            data: error.response.data
+          } : 'No response received'
+        });
+        return Promise.reject(error);
+      }
+    );
   }
 
   async query(request: QueryRequest): Promise<QueryResponse> {
     try {
+      console.log('Sending query request:', request);
+      
+      // For web platform, try fetch as fallback if axios fails due to CORS
+      if (Constants.platform?.web) {
+        try {
+          const response = await fetch(`${this.baseURL}/query`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(request),
+            mode: 'cors',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          console.log('Query response data (fetch):', data);
+          
+          // Validate response structure
+          if (!data || !data.response) {
+            throw new Error('Invalid response format from API');
+          }
+          
+          return data;
+        } catch (fetchError) {
+          console.error('Fetch failed, trying axios:', fetchError);
+          // Fall through to axios attempt
+        }
+      }
+      
       const response = await this.client.post('/query', request);
+      console.log('Query response data (axios):', response.data);
+      
+      // Validate response structure
+      if (!response.data || !response.data.response) {
+        throw new Error('Invalid response format from API');
+      }
+      
       return response.data;
     } catch (error) {
       console.error('API Query Error:', error);
+      console.error('Error details:', {
+        message: (error as any).message,
+        response: (error as any).response,
+        status: (error as any).response?.status,
+        data: (error as any).response?.data
+      });
       throw error;
     }
   }

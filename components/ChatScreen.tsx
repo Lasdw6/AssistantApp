@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
 import HealthModal from './HealthModal';
 import UploadModal from './UploadModal';
+import SpeechManager from './SpeechManager';
+import SpeechGuide from './SpeechGuide';
 
 interface Message {
   id: string;
@@ -31,7 +33,22 @@ export default function ChatScreen() {
   const [isConnected, setIsConnected] = useState(false);
   const [healthModalVisible, setHealthModalVisible] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [speechGuideVisible, setSpeechGuideVisible] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Speech Manager Hook
+  const speechManager = SpeechManager({
+    onSpeechResult: (text: string) => {
+      setInputText(text);
+    },
+    onSpeechStart: () => {
+      console.log('Speech recognition started');
+    },
+    onSpeechEnd: () => {
+      console.log('Speech recognition ended');
+    },
+  });
 
   useEffect(() => {
     checkAPIHealth();
@@ -110,6 +127,11 @@ export default function ChatScreen() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Speak the response if speech is enabled and supported
+      if (speechEnabled && speechManager.isSupported && response.response) {
+        speechManager.speak(response.response);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -119,18 +141,30 @@ export default function ChatScreen() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Speak error message if speech is enabled and supported
+      if (speechEnabled && speechManager.isSupported) {
+        speechManager.speak('Sorry, I encountered an error while processing your request. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const renderMessage = (message: Message) => (
-    <View
+    <TouchableOpacity
       key={message.id}
       style={[
         styles.messageContainer,
         message.isUser ? styles.userMessage : styles.assistantMessage,
       ]}
+             onPress={() => {
+         if (speechEnabled && speechManager.isSupported && !message.isUser) {
+           speechManager.speak(message.content);
+         }
+       }}
+       activeOpacity={message.isUser || !speechEnabled || !speechManager.isSupported ? 1 : 0.7}
+       style={{ pointerEvents: message.isUser || !speechEnabled || !speechManager.isSupported ? 'none' : 'auto' }}
     >
       <Text style={[
         styles.messageText,
@@ -148,10 +182,15 @@ export default function ChatScreen() {
           ))}
         </View>
       )}
-      <Text style={styles.timestamp}>
-        {message.timestamp.toLocaleTimeString()}
-      </Text>
-    </View>
+              <View style={styles.messageFooter}>
+          <Text style={styles.timestamp}>
+            {message.timestamp.toLocaleTimeString()}
+          </Text>
+          {!message.isUser && speechEnabled && speechManager.isSupported && (
+            <Text style={styles.tapToSpeakHint}>Tap to speak</Text>
+          )}
+        </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -160,6 +199,25 @@ export default function ChatScreen() {
         <Text style={styles.headerTitle}>Personal Assistant</Text>
         
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => setSpeechGuideVisible(true)}
+            style={styles.uploadButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.uploadButtonText}>❓</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={() => setSpeechEnabled(!speechEnabled)}
+            style={[styles.uploadButton, !speechManager.isSupported && styles.disabledButton]}
+            activeOpacity={speechManager.isSupported ? 0.7 : 1}
+            disabled={!speechManager.isSupported}
+          >
+            <Text style={styles.uploadButtonText}>
+              {!speechManager.isSupported ? '🚫' : speechEnabled ? '🔊' : '🔇'}
+            </Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity
             onPress={() => setUploadModalVisible(true)}
             style={styles.uploadButton}
@@ -199,7 +257,10 @@ export default function ChatScreen() {
                 Welcome! I'm your personal assistant. How can I help you today?
               </Text>
               <Text style={styles.welcomeSubtext}>
-                Tap the status indicator above for system health details, or the document icon to upload files.
+                {speechManager.isSupported 
+                  ? "You can type or speak your messages! Tap ❓ for speech features guide, 📄 to upload files, or the status indicator for system health."
+                  : "Type your messages below. Speech features are not available on this platform. Tap 📄 to upload files or the status indicator for system health."
+                }
               </Text>
             </View>
           )}
@@ -213,30 +274,57 @@ export default function ChatScreen() {
         </ScrollView>
 
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type your message..."
-            multiline
-            maxLength={1000}
-            editable={!isLoading}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isLoading) && styles.sendButtonDisabled
-            ]}
-            onPress={sendMessage}
-            disabled={!inputText.trim() || isLoading}
-          >
-            <Text style={[
-              styles.sendButtonText,
-              (!inputText.trim() || isLoading) && styles.sendButtonTextDisabled
-            ]}>
-              Send
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type or speak your message..."
+              multiline
+              maxLength={1000}
+              editable={!isLoading}
+            />
+            {speechManager.isSupported && (
+              <TouchableOpacity
+                style={[
+                  styles.voiceButton,
+                  speechManager.isListening && styles.voiceButtonActive
+                ]}
+                onPress={speechManager.startListening}
+                disabled={isLoading || speechManager.isSpeaking}
+              >
+                <Text style={styles.voiceButtonText}>
+                  {speechManager.isListening ? '🎤' : '🎙️'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isLoading) && styles.sendButtonDisabled
+              ]}
+              onPress={sendMessage}
+              disabled={!inputText.trim() || isLoading}
+            >
+              <Text style={[
+                styles.sendButtonText,
+                (!inputText.trim() || isLoading) && styles.sendButtonTextDisabled
+              ]}>
+                Send
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {speechManager.isSpeaking && (
+            <View style={styles.speechStatusContainer}>
+              <Text style={styles.speechStatusText}>🔊 Speaking...</Text>
+              <TouchableOpacity
+                style={styles.stopSpeechButton}
+                onPress={speechManager.stopSpeaking}
+              >
+                <Text style={styles.stopSpeechText}>Stop</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -249,6 +337,11 @@ export default function ChatScreen() {
         visible={uploadModalVisible}
         onClose={() => setUploadModalVisible(false)}
         onUploadSuccess={handleUploadSuccess}
+      />
+
+      <SpeechGuide
+        visible={speechGuideVisible}
+        onClose={() => setSpeechGuideVisible(false)}
       />
     </SafeAreaView>
   );
@@ -288,6 +381,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  disabledButton: {
+    backgroundColor: '#f0f0f0',
+    borderColor: '#d0d0d0',
+    opacity: 0.6,
   },
   uploadButtonText: {
     fontSize: 16,
@@ -381,11 +479,20 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 2,
   },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   timestamp: {
     fontSize: 10,
     color: '#999',
-    marginTop: 4,
-    alignSelf: 'flex-end',
+  },
+  tapToSpeakHint: {
+    fontSize: 9,
+    color: '#007AFF',
+    fontStyle: 'italic',
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -398,13 +505,15 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   textInput: {
     flex: 1,
@@ -413,9 +522,52 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginRight: 12,
+    marginRight: 8,
     maxHeight: 100,
     fontSize: 16,
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f8f8f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  voiceButtonActive: {
+    backgroundColor: '#FF3B30',
+    borderColor: '#FF3B30',
+  },
+  voiceButtonText: {
+    fontSize: 18,
+  },
+  speechStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  speechStatusText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  stopSpeechButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#FF3B30',
+    borderRadius: 4,
+  },
+  stopSpeechText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
   sendButton: {
     backgroundColor: '#007AFF',
