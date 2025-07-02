@@ -3,27 +3,71 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import ChatScreen from './components/ChatScreen';
 import VoiceChatScreen from './components/VoiceChatScreen';
+import UploadModal from './components/UploadModal';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChatProvider } from './contexts/ChatContext';
 
 export default function App() {
-  const [mode, setMode] = useState<'chat'|'voice'>('voice');
+  // Track the currently selected tab (chat | voice | upload)
+  const [tab, setTab] = useState<'chat' | 'voice' | 'upload'>('voice');
+
+  // Remember the last non-upload tab so we can return after closing upload
+  const [lastMainTab, setLastMainTab] = useState<'chat' | 'voice'>('voice');
+
   return (
     <ChatProvider>
       <SafeAreaProvider>
         <SafeAreaView style={styles.container}>
           <View style={styles.screenContainer}>
-            {mode === 'chat' ? <ChatScreen /> : <VoiceChatScreen />}
+            {/* Render the active main tab. When "upload" is selected the modal will overlay the last main tab */}
+            {tab === 'chat' && <ChatScreen />}
+            {tab === 'voice' && <VoiceChatScreen />}
+            {tab === 'upload' && (lastMainTab === 'chat' ? <ChatScreen /> : <VoiceChatScreen />)}
           </View>
           <View style={styles.tabBar}>
-            <TouchableOpacity onPress={() => setMode('chat')} style={styles.tabButton}>
-              <MaterialIcons name="chat" size={28} color={mode === 'chat' ? '#0ff' : '#333'} />
+            <TouchableOpacity
+              onPress={() => {
+                setTab('chat');
+                setLastMainTab('chat');
+              }}
+              style={styles.tabButton}
+            >
+              <MaterialIcons name="chat" size={28} color={tab === 'chat' ? '#0ff' : '#333'} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setMode('voice')} style={styles.tabButton}>
-              <MaterialIcons name="mic" size={28} color={mode === 'voice' ? '#0ff' : '#333'} />
+
+            <TouchableOpacity
+              onPress={() => {
+                setTab('voice');
+                setLastMainTab('voice');
+              }}
+              style={styles.tabButton}
+            >
+              <MaterialIcons name="mic" size={28} color={tab === 'voice' ? '#0ff' : '#333'} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                // Switch to the upload modal tab but keep note of current main tab
+                setTab('upload');
+              }}
+              style={styles.tabButton}
+            >
+              <MaterialIcons name="upload-file" size={28} color={tab === 'upload' ? '#0ff' : '#333'} />
             </TouchableOpacity>
           </View>
+          {/* Upload modal overlays the current screen when the upload tab is active */}
+          <UploadModal
+            visible={tab === 'upload'}
+            onClose={() => {
+              // Return to whatever main tab we were on previously
+              setTab(lastMainTab);
+            }}
+            onUploadSuccess={() => {
+              // After successful upload, go back to the previous tab
+              setTab(lastMainTab);
+            }}
+          />
         </SafeAreaView>
         <StatusBar style="auto" />
       </SafeAreaProvider>

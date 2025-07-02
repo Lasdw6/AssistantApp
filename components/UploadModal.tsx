@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { assistantAPI, DocumentInput, IngestResponse, BatchIngestResponse } from '../services/api';
+import { COLORS } from '../theme';
 
 interface UploadModalProps {
   visible: boolean;
@@ -433,7 +434,7 @@ export default function UploadModal({ visible, onClose, onUploadSuccess }: Uploa
           {uploading && (
             <View style={styles.section}>
               <View style={styles.progressContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={COLORS.accent} />
                 <Text style={styles.progressText}>{uploadProgress}</Text>
               </View>
             </View>
@@ -466,7 +467,7 @@ export default function UploadModal({ visible, onClose, onUploadSuccess }: Uploa
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -474,27 +475,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: COLORS.accent,
     paddingTop: 50,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
   },
   closeButton: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
     fontSize: 18,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   content: {
     flex: 1,
@@ -506,12 +507,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 10,
   },
   instructionText: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
     lineHeight: 20,
     marginBottom: 8,
   },
@@ -520,30 +521,30 @@ const styles = StyleSheet.create({
   },
   formatItem: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 2,
   },
   selectButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.accent,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: COLORS.accent,
     borderStyle: 'dashed',
   },
   selectButtonText: {
-    color: '#fff',
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: '600',
   },
   documentCard: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: COLORS.accent,
   },
   documentHeader: {
     flexDirection: 'row',
@@ -557,25 +558,25 @@ const styles = StyleSheet.create({
   documentName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   documentDetails: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   removeButton: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
   removeButtonText: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   metadataSection: {
     marginBottom: 12,
@@ -583,17 +584,17 @@ const styles = StyleSheet.create({
   metadataLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   metadataInput: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: COLORS.accent,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    backgroundColor: '#fafafa',
+    backgroundColor: COLORS.surface,
   },
   progressContainer: {
     alignItems: 'center',
@@ -602,30 +603,30 @@ const styles = StyleSheet.create({
   progressText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   footer: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: COLORS.accent,
   },
   uploadButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.accent,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
   },
   uploadButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: COLORS.disabled,
   },
   uploadButtonText: {
-    color: '#fff',
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: '600',
   },
   uploadButtonTextDisabled: {
-    color: '#999',
+    color: COLORS.textSecondary,
   },
 }); 

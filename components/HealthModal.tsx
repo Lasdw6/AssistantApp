@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { assistantAPI, HealthResponse } from '../services/api';
+import { COLORS } from '../theme';
 
 interface HealthModalProps {
   visible: boolean;
@@ -95,7 +96,7 @@ export default function HealthModal({ visible, onClose }: HealthModalProps) {
         >
           {loading && !healthData && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
+              <ActivityIndicator size="large" color={COLORS.accent} />
               <Text style={styles.loadingText}>Loading health data...</Text>
             </View>
           )}
@@ -261,7 +262,7 @@ export default function HealthModal({ visible, onClose }: HealthModalProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -269,27 +270,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: COLORS.accent,
     paddingTop: 50, // Account for status bar
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
   },
   closeButton: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
     fontSize: 18,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   content: {
     flex: 1,
@@ -301,15 +302,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 10,
   },
   statusCard: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: COLORS.accent,
   },
   statusRow: {
     flexDirection: 'row',
@@ -324,19 +325,19 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
   },
   lastUpdated: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginTop: 8,
   },
   serviceCard: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: COLORS.accent,
   },
   serviceHeader: {
     flexDirection: 'row',
@@ -352,7 +353,7 @@ const styles = StyleSheet.create({
   serviceName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     flex: 1,
   },
   serviceStatus: {
@@ -370,12 +371,12 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
   },
   indexItem: {
     marginTop: 4,
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   },
   indexName: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     fontFamily: 'monospace',
   },
   indexStats: {
@@ -395,7 +396,7 @@ const styles = StyleSheet.create({
   },
   indexCount: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginLeft: 4,
   },
   indexStatus: {
@@ -410,40 +411,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statItem: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     width: '48%',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: COLORS.accent,
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   footer: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: COLORS.accent,
   },
   refreshButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.accent,
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
   },
   refreshButtonText: {
-    color: '#fff',
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -456,7 +457,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   errorContainer: {
     alignItems: 'center',
@@ -469,18 +470,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#F44336',
+    color: COLORS.error,
     textAlign: 'center',
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: COLORS.error,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
   retryButtonText: {
-    color: '#fff',
+    color: COLORS.onError,
     fontSize: 14,
     fontWeight: '600',
   },
