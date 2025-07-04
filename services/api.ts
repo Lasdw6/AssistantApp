@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface QueryRequest {
   query: string;
@@ -103,18 +104,7 @@ class AssistantAPI {
   constructor() {
     // Get API URL from Expo config or fallback to localhost
     const configuredUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
-    
-    // For web development, try to detect the correct URL
-    if (Constants.platform?.web) {
-      // Try to use the direct URL - this should work if the backend has CORS enabled
-      this.baseURL = configuredUrl;
-    } else {
-      this.baseURL = configuredUrl;
-    }
-    
-    console.log('API Base URL:', this.baseURL);
-    console.log('Platform:', Constants.platform);
-    
+    this.baseURL = configuredUrl;
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
@@ -161,14 +151,19 @@ class AssistantAPI {
     );
   }
 
+  // Helper to get the current API URL (from AsyncStorage if set, else default)
+  private async getApiUrl(): Promise<string> {
+    const stored = await AsyncStorage.getItem('API_URL');
+    return stored || this.baseURL;
+  }
+
   async query(request: QueryRequest): Promise<QueryResponse> {
     try {
-      console.log('Sending query request:', request);
-      
+      const apiUrl = await this.getApiUrl();
       // For web platform, try fetch as fallback if axios fails due to CORS
       if (Constants.platform?.web) {
         try {
-          const response = await fetch(`${this.baseURL}/query`, {
+          const response = await fetch(`${apiUrl}/query`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -176,43 +171,24 @@ class AssistantAPI {
             body: JSON.stringify(request),
             mode: 'cors',
           });
-          
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
           const data = await response.json();
-          console.log('Query response data (fetch):', data);
-          
-          // Validate response structure
           if (!data || !data.response) {
             throw new Error('Invalid response format from API');
           }
-          
           return data;
         } catch (fetchError) {
-          console.error('Fetch failed, trying axios:', fetchError);
           // Fall through to axios attempt
         }
       }
-      
-      const response = await this.client.post('/query', request);
-      console.log('Query response data (axios):', response.data);
-      
-      // Validate response structure
-      if (!response.data || !response.data.response) {
-        throw new Error('Invalid response format from API');
-      }
-      
+      const response = await axios.post(`${apiUrl}/query`, request, {
+        timeout: 30000,
+        headers: { 'Content-Type': 'application/json' },
+      });
       return response.data;
     } catch (error) {
-      console.error('API Query Error:', error);
-      console.error('Error details:', {
-        message: (error as any).message,
-        response: (error as any).response,
-        status: (error as any).response?.status,
-        data: (error as any).response?.data
-      });
       throw error;
     }
   }
@@ -262,13 +238,9 @@ class AssistantAPI {
   }
 
   async getHealth(): Promise<HealthResponse> {
-    try {
-      const response = await this.client.get('/health');
-      return response.data;
-    } catch (error) {
-      console.error('API Health Check Error:', error);
-      throw error;
-    }
+    const apiUrl = await this.getApiUrl();
+    const response = await axios.get(`${apiUrl}/health`, { timeout: 10000 });
+    return response.data;
   }
 
   async listDriveFiles(folderId?: string, maxResults: number = 100): Promise<{

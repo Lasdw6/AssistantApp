@@ -4,9 +4,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import ChatScreen from './components/ChatScreen';
 import VoiceChatScreen from './components/VoiceChatScreen';
 import UploadModal from './components/UploadModal';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Modal, Text, TextInput, Button } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChatProvider } from './contexts/ChatContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
   // Track the currently selected tab (chat | voice | upload)
@@ -14,6 +15,34 @@ export default function App() {
 
   // Remember the last non-upload tab so we can return after closing upload
   const [lastMainTab, setLastMainTab] = useState<'chat' | 'voice'>('voice');
+
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [apiUrl, setApiUrl] = useState('');
+  const [defaultApiUrl, setDefaultApiUrl] = useState('');
+  const [apiUrlInput, setApiUrlInput] = useState('');
+
+  React.useEffect(() => {
+    // Load API_URL from AsyncStorage or config
+    const loadApiUrl = async () => {
+      const configUrl = (require('expo-constants').default.expoConfig?.extra?.apiUrl || 'http://localhost:8000');
+      setDefaultApiUrl(configUrl);
+      const stored = await AsyncStorage.getItem('API_URL');
+      setApiUrl(stored || configUrl);
+      setApiUrlInput(stored || configUrl);
+    };
+    loadApiUrl();
+  }, [settingsVisible]);
+
+  const saveApiUrl = async () => {
+    await AsyncStorage.setItem('API_URL', apiUrlInput);
+    setApiUrl(apiUrlInput);
+    setSettingsVisible(false);
+  };
+  const resetApiUrl = async () => {
+    await AsyncStorage.removeItem('API_URL');
+    setApiUrl(defaultApiUrl);
+    setApiUrlInput(defaultApiUrl);
+  };
 
   return (
     <ChatProvider>
@@ -55,6 +84,13 @@ export default function App() {
             >
               <MaterialIcons name="upload-file" size={28} color={tab === 'upload' ? '#0ff' : '#333'} />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setSettingsVisible(true)}
+              style={styles.tabButton}
+            >
+              <MaterialIcons name="settings" size={28} color={'#333'} />
+            </TouchableOpacity>
           </View>
           {/* Upload modal overlays the current screen when the upload tab is active */}
           <UploadModal
@@ -69,6 +105,26 @@ export default function App() {
             }}
           />
         </SafeAreaView>
+        <Modal visible={settingsVisible} animationType="slide" transparent>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#111', padding: 24, borderRadius: 12, width: '90%' }}>
+              <Text style={{ color: '#0ff', fontSize: 18, marginBottom: 12 }}>API URL</Text>
+              <TextInput
+                value={apiUrlInput}
+                onChangeText={setApiUrlInput}
+                style={{ backgroundColor: '#222', color: '#fff', padding: 8, borderRadius: 6, marginBottom: 12 }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Button title="Save" onPress={saveApiUrl} color="#0ff" />
+                <Button title="Reset" onPress={resetApiUrl} color="#f00" />
+                <Button title="Close" onPress={() => setSettingsVisible(false)} color="#888" />
+              </View>
+              <Text style={{ color: '#aaa', fontSize: 12, marginTop: 10 }}>Default: {defaultApiUrl}</Text>
+            </View>
+          </View>
+        </Modal>
         <StatusBar style="auto" />
       </SafeAreaProvider>
     </ChatProvider>
