@@ -9,6 +9,14 @@
         "developmentClient": true,
         "buildType": "apk"
       }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "API_URL": "http://3.232.15.86/"
+      }
     }
   }
 } 

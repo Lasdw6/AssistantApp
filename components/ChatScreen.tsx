@@ -10,10 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
 import HealthModal from './HealthModal';
-import UploadModal from './UploadModal';
 import SpeechManager from './SpeechManager';
 import SpeechGuide from './SpeechGuide';
 import { COLORS } from '../theme';
@@ -32,9 +32,8 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [healthModalVisible, setHealthModalVisible] = useState(false);
-  const [uploadModalVisible, setUploadModalVisible] = useState(false);
-  const [speechGuideVisible, setSpeechGuideVisible] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [isFormalTone, setIsFormalTone] = useState(false); // Start with casual tone
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Speech Manager Hook
@@ -54,6 +53,31 @@ export default function ChatScreen() {
     checkAPIHealth();
   }, []);
 
+  // PanResponder for two-finger swipe gesture
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to two-finger gestures
+        return evt.nativeEvent.touches.length === 2;
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return evt.nativeEvent.touches.length === 2;
+      },
+      onPanResponderGrant: () => {
+        // Gesture started
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Track movement for swipe detection
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Check if it was a horizontal swipe
+        if (Math.abs(gestureState.dx) > 50) {
+          setIsFormalTone(prev => !prev);
+        }
+      },
+    })
+  ).current;
+
   useEffect(() => {
     // Auto-scroll to bottom when messages change
     setTimeout(() => {
@@ -69,7 +93,9 @@ export default function ChatScreen() {
       setIsConnected(false);
       Alert.alert(
         'Connection Error',
-        'Unable to connect to the Assistant API. Please check if the server is running.'
+        isFormalTone 
+          ? 'Unable to establish connection with the server. Please ensure the server is operational.'
+          : 'Can\'t connect to the server. Make sure it\'s running!'
       );
     }
   };
@@ -80,21 +106,15 @@ export default function ChatScreen() {
     } else {
       Alert.alert(
         'Connection Status',
-        'API is currently disconnected. Please check your server and network connection.',
+        isFormalTone 
+          ? 'Server is currently offline. Please verify your connection and attempt again.'
+          : 'Server is offline. Check your connection and try again.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Retry', onPress: checkAPIHealth }
         ]
       );
     }
-  };
-
-  const handleUploadSuccess = () => {
-    // Show success message and optionally refresh something
-    Alert.alert(
-      'Upload Complete',
-      'Documents have been added to the knowledge base. You can now ask questions about them!'
-    );
   };
 
   const sendMessage = async () => {
@@ -136,7 +156,7 @@ export default function ChatScreen() {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+        content: isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?',
         isUser: false,
         timestamp: new Date(),
       };
@@ -144,7 +164,7 @@ export default function ChatScreen() {
       
       // Speak error message if speech is enabled and supported
       if (speechEnabled && speechManager?.isSupported) {
-        speechManager?.speak('Sorry, I encountered an error while processing your request. Please try again.');
+        speechManager?.speak(isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?');
       }
     } finally {
       setIsLoading(false);
@@ -186,45 +206,20 @@ export default function ChatScreen() {
             {message.timestamp.toLocaleTimeString()}
           </Text>
           {!message.isUser && speechEnabled && speechManager?.isSupported && (
-            <Text style={styles.tapToSpeakHint}>Tap to speak</Text>
+            <Text style={styles.tapToSpeakHint}>
+              {isFormalTone ? 'Tap to hear' : 'Tap to speak'}
+            </Text>
           )}
         </View>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Personal Assistant</Text>
+        <Text style={styles.headerTitle}>Chat</Text>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => setSpeechGuideVisible(true)}
-            style={styles.uploadButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.uploadButtonText}>❓</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => setSpeechEnabled(!speechEnabled)}
-            style={[styles.uploadButton, !speechManager?.isSupported && styles.disabledButton]}
-            activeOpacity={speechManager?.isSupported ? 0.7 : 1}
-            disabled={!speechManager?.isSupported}
-          >
-            <Text style={styles.uploadButtonText}>
-              {!speechManager?.isSupported ? '🚫' : speechEnabled ? '🔊' : '🔇'}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => setUploadModalVisible(true)}
-            style={styles.uploadButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.uploadButtonText}>📄</Text>
-          </TouchableOpacity>
-          
           <TouchableOpacity
             onPress={handleStatusIndicatorPress}
             style={styles.statusContainer}
@@ -253,12 +248,19 @@ export default function ChatScreen() {
           {messages.length === 0 && (
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeText}>
-                Welcome! I'm your personal assistant. How can I help you today?
+                {isFormalTone 
+                  ? 'Greetings! I am your personal assistant. How may I be of assistance today?'
+                  : 'Welcome! I\'m your personal assistant. How can I help you today?'
+                }
               </Text>
               <Text style={styles.welcomeSubtext}>
-                {speechManager?.isSupported 
-                  ? "You can type or speak your messages! Tap ❓ for speech features guide, 📄 to upload files, or the status indicator for system health."
-                  : "Type your messages below. Speech features are not available on this platform. Tap 📄 to upload files or the status indicator for system health."
+                {isFormalTone 
+                  ? (speechManager?.isSupported 
+                    ? "You may type or speak your messages."
+                    : "Please type your messages below.")
+                  : (speechManager?.isSupported 
+                    ? "You can type or speak your messages!"
+                    : "Type your messages below.")
                 }
               </Text>
             </View>
@@ -267,7 +269,9 @@ export default function ChatScreen() {
           {isLoading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.accent} />
-              <Text style={styles.loadingText}>Thinking...</Text>
+              <Text style={styles.loadingText}>
+                {isFormalTone ? 'Processing your request...' : 'Thinking...'}
+              </Text>
             </View>
           )}
         </ScrollView>
@@ -278,7 +282,7 @@ export default function ChatScreen() {
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Type or speak your message..."
+              placeholder={isFormalTone ? "Type here..." : "Type here..."}
               multiline
               maxLength={1000}
               editable={!isLoading}
@@ -309,18 +313,22 @@ export default function ChatScreen() {
                 styles.sendButtonText,
                 (!inputText.trim() || isLoading) && styles.sendButtonTextDisabled
               ]}>
-                Send
+                {isFormalTone ? 'Submit' : 'Send'}
               </Text>
             </TouchableOpacity>
           </View>
           {speechManager?.isSpeaking && (
             <View style={styles.speechStatusContainer}>
-              <Text style={styles.speechStatusText}>🔊 Speaking...</Text>
+              <Text style={styles.speechStatusText}>
+                🔊 {isFormalTone ? 'Speaking...' : 'Speaking...'}
+              </Text>
               <TouchableOpacity
                 style={styles.stopSpeechButton}
                 onPress={speechManager?.stopSpeaking}
               >
-                <Text style={styles.stopSpeechText}>Stop</Text>
+                <Text style={styles.stopSpeechText}>
+                  {isFormalTone ? 'Cease' : 'Stop'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -330,17 +338,7 @@ export default function ChatScreen() {
       <HealthModal
         visible={healthModalVisible}
         onClose={() => setHealthModalVisible(false)}
-      />
-
-      <UploadModal
-        visible={uploadModalVisible}
-        onClose={() => setUploadModalVisible(false)}
-        onUploadSuccess={handleUploadSuccess}
-      />
-
-      <SpeechGuide
-        visible={speechGuideVisible}
-        onClose={() => setSpeechGuideVisible(false)}
+        isFormalTone={isFormalTone}
       />
     </View>
   );
@@ -370,24 +368,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  uploadButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  disabledButton: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.disabled,
-    opacity: 0.6,
-  },
-  uploadButtonText: {
-    fontSize: 16,
   },
   statusContainer: {
     flexDirection: 'row',

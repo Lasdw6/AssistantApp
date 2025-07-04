@@ -6,6 +6,7 @@ export interface QueryRequest {
   context?: string;
   options?: Record<string, any>;
   memory_confirmation?: Record<string, any>;
+  tone?: 'formal' | 'casual';
 }
 
 export interface QueryResponse {

@@ -9,15 +9,16 @@ import {
   Platform,
   ActivityIndicator,
   TouchableOpacity,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
 import SpeechManager from './SpeechManager';
 import VoiceVisualizer from './VoiceVisualizer';
 import HealthModal from './HealthModal';
-import UploadModal from './UploadModal';
 import * as ExpoSpeech from 'expo-speech';
 import { COLORS } from '../theme';
+import { MaterialIcons } from '@expo/vector-icons';
 
 interface Message {
   id: string;
@@ -32,23 +33,39 @@ export default function VoiceChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [healthModalVisible, setHealthModalVisible] = useState(false);
-  const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
-  const [showMessages, setShowMessages] = useState(false);
+  const [isFormalTone, setIsFormalTone] = useState(false); // Start with casual tone
   const scrollViewRef = useRef<ScrollView>(null);
+  const showMessages = false;
   
   useEffect(() => {
     checkAPIHealth();
   }, []);
 
-  useEffect(() => {
-    // Auto-scroll to bottom when messages change
-    if (showMessages) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [messages, showMessages]);
+  // PanResponder for two-finger swipe gesture
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to two-finger gestures
+        return evt.nativeEvent.touches.length === 2;
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return evt.nativeEvent.touches.length === 2;
+      },
+      onPanResponderGrant: () => {
+        // Gesture started
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Track movement for swipe detection
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Check if it was a horizontal swipe
+        if (Math.abs(gestureState.dx) > 50) {
+          setIsFormalTone(prev => !prev);
+        }
+      },
+    })
+  ).current;
 
   const checkAPIHealth = async () => {
     try {
@@ -58,7 +75,9 @@ export default function VoiceChatScreen() {
       setIsConnected(false);
       Alert.alert(
         'Connection Error',
-        'Unable to connect to the Assistant API. Please check if the server is running.'
+        isFormalTone 
+          ? 'Unable to establish connection with the server. Please ensure the server is operational.'
+          : 'Can\'t connect to the server. Make sure it\'s running!'
       );
     }
   };
@@ -69,20 +88,15 @@ export default function VoiceChatScreen() {
     } else {
       Alert.alert(
         'Connection Status',
-        'API is currently disconnected. Please check your server and network connection.',
+        isFormalTone 
+          ? 'Server is currently offline. Please verify your connection and attempt again.'
+          : 'Server is offline. Check your connection and try again.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Retry', onPress: checkAPIHealth }
         ]
       );
     }
-  };
-
-  const handleUploadSuccess = () => {
-    Alert.alert(
-      'Upload Complete',
-      'Documents have been added to the knowledge base. You can now ask questions about them!'
-    );
   };
 
   const handleSpeechResult = async (text: string) => {
@@ -97,7 +111,6 @@ export default function VoiceChatScreen() {
 
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-    setShowMessages(true);
 
     try {
       const queryRequest: QueryRequest = {
@@ -128,7 +141,7 @@ export default function VoiceChatScreen() {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+        content: isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?',
         isUser: false,
         timestamp: new Date(),
       };
@@ -136,7 +149,7 @@ export default function VoiceChatScreen() {
       
       // Speak error message if speech is enabled
       if (speechEnabled) {
-        await ExpoSpeech.speak('Sorry, I encountered an error while processing your request. Please try again.', {
+        await ExpoSpeech.speak(isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?', {
           language: 'en-US',
           pitch: 1.0,
           rate: 0.75,
@@ -188,16 +201,18 @@ export default function VoiceChatScreen() {
           {message.timestamp.toLocaleTimeString()}
         </Text>
         {!message.isUser && speechEnabled && (
-          <Text style={styles.tapToSpeakHint}>Tap to speak</Text>
+          <Text style={styles.tapToSpeakHint}>
+            {isFormalTone ? 'Tap to hear' : 'Tap to speak'}
+          </Text>
         )}
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} {...panResponder.panHandlers}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Voice Assistant</Text>
+        <Text style={styles.headerTitle}>Voice Chat</Text>
         
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -205,25 +220,11 @@ export default function VoiceChatScreen() {
             style={[styles.headerButton]}
             activeOpacity={0.7}
           >
-            <Text style={styles.headerButtonText}>
-              {speechEnabled ? '🔊' : '🔇'}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => setUploadModalVisible(true)}
-            style={styles.headerButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.headerButtonText}>📄</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => setShowMessages(!showMessages)}
-            style={styles.headerButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.headerButtonText}>💬</Text>
+            <MaterialIcons
+              name={speechEnabled ? 'volume-up' : 'volume-off'}
+              size={20}
+              color={speechEnabled ? COLORS.accent : COLORS.textSecondary}
+            />
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -247,14 +248,17 @@ export default function VoiceChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Main Voice Interface */}
-        <View style={[styles.voiceContainer, { flex: showMessages ? 0.5 : 1 }]}>
-          {!showMessages && messages.length === 0 && (
+        <View style={[styles.voiceContainer, { flex: 1 }]}>
+          {messages.length === 0 && (
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeText}>
-                Welcome! I'm your voice assistant.
+                {isFormalTone ? 'Welcome! Ready to begin our conversation?' : 'Hey there! Ready to chat?'}
               </Text>
               <Text style={styles.welcomeSubtext}>
-                Tap the microphone button in the speech controls below to start speaking, or use the buttons above for more options.
+                {isFormalTone 
+                  ? 'Please hold down the microphone button and commence speaking. Utilize the volume control above to manage speech output.'
+                  : 'Just hold down the mic button and start talking. Use the volume button up top to toggle speech output.'
+                }
               </Text>
             </View>
           )}
@@ -268,12 +272,14 @@ export default function VoiceChatScreen() {
           {isLoading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#007AFF" />
-              <Text style={styles.loadingText}>Processing your request...</Text>
+              <Text style={styles.loadingText}>
+                {isFormalTone ? 'Processing your request...' : 'Thinking...'}
+              </Text>
             </View>
           )}
 
           {/* Show last assistant response */}
-          {!showMessages && messages.length > 0 && (
+          {messages.length > 0 && (
             <View style={styles.lastResponseContainer}>
               {messages.slice(-1).map(message => 
                 !message.isUser ? (
@@ -285,30 +291,12 @@ export default function VoiceChatScreen() {
             </View>
           )}
         </View>
-
-        {/* Messages Panel */}
-        {showMessages && (
-          <View style={styles.messagesPanel}>
-            <ScrollView
-              ref={scrollViewRef}
-              style={styles.messagesContainer}
-              contentContainerStyle={styles.messagesContent}
-            >
-              {messages.map(renderMessage)}
-            </ScrollView>
-          </View>
-        )}
       </KeyboardAvoidingView>
 
       <HealthModal
         visible={healthModalVisible}
         onClose={() => setHealthModalVisible(false)}
-      />
-
-      <UploadModal
-        visible={uploadModalVisible}
-        onClose={() => setUploadModalVisible(false)}
-        onUploadSuccess={handleUploadSuccess}
+        isFormalTone={isFormalTone}
       />
     </SafeAreaView>
   );

@@ -15,9 +15,10 @@ import { COLORS } from '../theme';
 interface HealthModalProps {
   visible: boolean;
   onClose: () => void;
+  isFormalTone: boolean;
 }
 
-export default function HealthModal({ visible, onClose }: HealthModalProps) {
+export default function HealthModal({ visible, onClose, isFormalTone }: HealthModalProps) {
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +135,41 @@ export default function HealthModal({ visible, onClose }: HealthModalProps) {
                 </View>
               </View>
 
+              {/* UI Tone Settings */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Interface Settings</Text>
+                <View style={styles.serviceCard}>
+                  <View style={styles.serviceHeader}>
+                    <View style={[
+                      styles.serviceIndicator,
+                      { backgroundColor: isFormalTone ? '#4CAF50' : '#FF9800' }
+                    ]} />
+                    <Text style={styles.serviceName}>UI Tone</Text>
+                    <Text style={[
+                      styles.serviceStatus,
+                      { color: isFormalTone ? '#4CAF50' : '#FF9800' }
+                    ]}>
+                      {isFormalTone ? 'FORMAL' : 'CASUAL'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.serviceDetails}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Current Mode:</Text>
+                      <Text style={styles.detailValue}>
+                        {isFormalTone ? 'Formal Interface' : 'Casual Interface'}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Gesture Control:</Text>
+                      <Text style={styles.detailValue}>
+                        Two-finger swipe
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
               {/* Pinecone Status */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Vector Database (Pinecone)</Text>
@@ -217,15 +253,19 @@ export default function HealthModal({ visible, onClose }: HealthModalProps) {
                 <Text style={styles.sectionTitle}>Quick Stats</Text>
                 <View style={styles.statsGrid}>
                   <View style={styles.statItem}>
-                    <Text style={styles.statValue}>
-                      {healthData.pinecone.status === 'connected' ? '🟢' : '🔴'}
-                    </Text>
+                    {healthData.pinecone.status === 'connected' ? (
+                      <View style={styles.quickStatCircle} />
+                    ) : (
+                      <View style={styles.quickStatCircleError} />
+                    )}
                     <Text style={styles.statLabel}>Database</Text>
                   </View>
                   <View style={styles.statItem}>
-                    <Text style={styles.statValue}>
-                      {healthData.memory.status === 'connected' ? '🟢' : '🔴'}
-                    </Text>
+                    {healthData.memory.status === 'connected' ? (
+                      <View style={styles.quickStatCircle} />
+                    ) : (
+                      <View style={styles.quickStatCircleError} />
+                    )}
                     <Text style={styles.statLabel}>Memory</Text>
                   </View>
                   <View style={styles.statItem}>
@@ -484,5 +524,29 @@ const styles = StyleSheet.create({
     color: COLORS.onError,
     fontSize: 14,
     fontWeight: '600',
+  },
+  quickStatCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    shadowColor: '#4CAF50',
+    shadowOpacity: 0.7,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 8,
+    alignSelf: 'center',
+  },
+  quickStatCircleError: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F44336',
+    shadowColor: '#F44336',
+    shadowOpacity: 0.7,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 8,
+    alignSelf: 'center',
   },
 }); 

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Alert, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Alert, Platform, Image } from 'react-native';
 import * as ExpoSpeech from 'expo-speech';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 import { MaterialIcons } from '@expo/vector-icons';
+import InteractiveGifButton from './InteractiveGifButton';
 
 interface SpeechManagerProps {
   onSpeechResult?: (result: string) => void;
@@ -22,6 +23,7 @@ const SpeechManager: React.FC<SpeechManagerProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [speechError, setSpeechError] = useState(false);
 
   useEffect(() => {
     initializeSpeech();
@@ -87,11 +89,8 @@ const SpeechManager: React.FC<SpeechManagerProps> = ({
         [{ text: 'OK' }]
       );
     } else {
-      Alert.alert(
-        'Speech Recognition Error',
-        `Error: ${event.message || event.error}`,
-        [{ text: 'OK' }]
-      );
+      setSpeechError(true);
+      setTimeout(() => setSpeechError(false), 2000);
     }
   });
 
@@ -101,8 +100,9 @@ const SpeechManager: React.FC<SpeechManagerProps> = ({
       return;
     }
 
+    // If already listening, stop first then start again
     if (isListening) {
-      return;
+      stopListening();
     }
 
     try {
@@ -135,6 +135,8 @@ const SpeechManager: React.FC<SpeechManagerProps> = ({
 
   const stopListening = () => {
     if (isListening) {
+      console.log('stopListening called');
+      setIsListening(false); // Force UI update immediately
       ExpoSpeechRecognitionModule.stop();
     }
   };
@@ -186,19 +188,22 @@ const SpeechManager: React.FC<SpeechManagerProps> = ({
         
   return (
     <View style={styles.container}>
-            <TouchableOpacity
-        style={[styles.micButton, isListening && styles.listeningButton]}
-        onPress={isListening ? stopListening : startListening}
-              disabled={isSpeaking}
-            >
-        <MaterialIcons
-          name={isListening ? 'mic-off' : 'mic'}
-          size={48}
-          color="white"
-        />
-            </TouchableOpacity>
+      <InteractiveGifButton
+        isListening={isListening}
+        onPressIn={() => {
+          console.log('Button pressed in - starting listening');
+          startListening();
+        }}
+        onPressOut={() => {
+          console.log('Button pressed out - stopping listening');
+          stopListening();
+        }}
+        size={200}
+        showLabel={true}
+        speechError={speechError}
+      />
             
-      {transcript && (
+      {transcript.trim() !== '' && (
         <View style={styles.transcriptContainer}>
           <Text style={styles.transcriptLabel}>Current:</Text>
           <Text style={styles.transcriptText}>{transcript}</Text>
