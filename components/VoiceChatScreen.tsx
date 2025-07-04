@@ -83,20 +83,7 @@ export default function VoiceChatScreen() {
   };
 
   const handleStatusIndicatorPress = () => {
-    if (isConnected) {
-      setHealthModalVisible(true);
-    } else {
-      Alert.alert(
-        'Connection Status',
-        isFormalTone 
-          ? 'Server is currently offline. Please verify your connection and attempt again.'
-          : 'Server is offline. Check your connection and try again.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Retry', onPress: checkAPIHealth }
-        ]
-      );
-    }
+    setHealthModalVisible(true);
   };
 
   const handleSpeechResult = async (text: string) => {
@@ -224,6 +211,19 @@ export default function VoiceChatScreen() {
               name={speechEnabled ? 'volume-up' : 'volume-off'}
               size={20}
               color={speechEnabled ? COLORS.accent : COLORS.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {/* Gear icon for HealthModal */}
+          <TouchableOpacity
+            onPress={() => setHealthModalVisible(true)}
+            style={[styles.headerButton, { marginLeft: 8 }]}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="settings"
+              size={22}
+              color={COLORS.accent}
             />
           </TouchableOpacity>
           

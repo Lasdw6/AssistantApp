@@ -26,13 +26,18 @@ export default {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      edgeToEdgeEnabled: true
+      edgeToEdgeEnabled: true,
+      permissions: [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      usesCleartextTraffic: true
     },
     web: {
       favicon: "./assets/favicon.png"
     },
     extra: {
-      apiUrl: process.env.API_URL,
+      apiUrl: process.env.API_URL || "http://localhost:8000",
       eas: {
         projectId: "965a3a5f-dbba-40ec-aa3e-5022d542d3f1"
       }

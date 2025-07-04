@@ -4,6 +4,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import ChatScreen from './components/ChatScreen';
 import VoiceChatScreen from './components/VoiceChatScreen';
 import UploadModal from './components/UploadModal';
+import NetworkTest from './components/NetworkTest';
 import { View, TouchableOpacity, StyleSheet, Modal, Text, TextInput, Button } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChatProvider } from './contexts/ChatContext';
@@ -84,13 +85,6 @@ export default function App() {
             >
               <MaterialIcons name="upload-file" size={28} color={tab === 'upload' ? '#0ff' : '#333'} />
             </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setSettingsVisible(true)}
-              style={styles.tabButton}
-            >
-              <MaterialIcons name="settings" size={28} color={'#333'} />
-            </TouchableOpacity>
           </View>
           {/* Upload modal overlays the current screen when the upload tab is active */}
           <UploadModal
@@ -105,26 +99,6 @@ export default function App() {
             }}
           />
         </SafeAreaView>
-        <Modal visible={settingsVisible} animationType="slide" transparent>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ backgroundColor: '#111', padding: 24, borderRadius: 12, width: '90%' }}>
-              <Text style={{ color: '#0ff', fontSize: 18, marginBottom: 12 }}>API URL</Text>
-              <TextInput
-                value={apiUrlInput}
-                onChangeText={setApiUrlInput}
-                style={{ backgroundColor: '#222', color: '#fff', padding: 8, borderRadius: 6, marginBottom: 12 }}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Button title="Save" onPress={saveApiUrl} color="#0ff" />
-                <Button title="Reset" onPress={resetApiUrl} color="#f00" />
-                <Button title="Close" onPress={() => setSettingsVisible(false)} color="#888" />
-              </View>
-              <Text style={{ color: '#aaa', fontSize: 12, marginTop: 10 }}>Default: {defaultApiUrl}</Text>
-            </View>
-          </View>
-        </Modal>
         <StatusBar style="auto" />
       </SafeAreaProvider>
     </ChatProvider>

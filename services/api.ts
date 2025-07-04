@@ -103,8 +103,18 @@ class AssistantAPI {
 
   constructor() {
     // Get API URL from Expo config or fallback to localhost
-    const configuredUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
+    let configuredUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000';
+    // Remove trailing slash if present
+    if (configuredUrl.endsWith('/')) {
+      configuredUrl = configuredUrl.slice(0, -1);
+    }
     this.baseURL = configuredUrl;
+    
+    // Debug logging to see what URL we're using
+    console.log('AssistantAPI constructor - Expo config:', Constants.expoConfig?.extra);
+    console.log('AssistantAPI constructor - Using baseURL:', this.baseURL);
+    console.log('AssistantAPI constructor - Environment API_URL:', process.env.API_URL);
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
@@ -153,17 +163,33 @@ class AssistantAPI {
 
   // Helper to get the current API URL (from AsyncStorage if set, else default)
   private async getApiUrl(): Promise<string> {
-    const stored = await AsyncStorage.getItem('API_URL');
-    return stored || this.baseURL;
+    try {
+      const stored = await AsyncStorage.getItem('API_URL');
+      const finalUrl = stored || this.baseURL;
+      console.log('getApiUrl - stored from AsyncStorage:', stored);
+      console.log('getApiUrl - final URL:', finalUrl);
+      return finalUrl;
+    } catch (error) {
+      console.error('Error getting API URL from AsyncStorage:', error);
+      return this.baseURL;
+    }
+  }
+
+  // Helper to join base URL and path safely
+  private joinUrl(path: string): string {
+    if (!path.startsWith('/')) path = '/' + path;
+    return this.baseURL + path;
   }
 
   async query(request: QueryRequest): Promise<QueryResponse> {
     try {
       const apiUrl = await this.getApiUrl();
+      // Remove trailing slash if present
+      const safeApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
       // For web platform, try fetch as fallback if axios fails due to CORS
       if (Constants.platform?.web) {
         try {
-          const response = await fetch(`${apiUrl}/query`, {
+          const response = await fetch(`${safeApiUrl}/query`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -183,7 +209,7 @@ class AssistantAPI {
           // Fall through to axios attempt
         }
       }
-      const response = await axios.post(`${apiUrl}/query`, request, {
+      const response = await axios.post(`${safeApiUrl}/query`, request, {
         timeout: 30000,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -195,7 +221,9 @@ class AssistantAPI {
 
   async ingestDocument(document: DocumentInput): Promise<IngestResponse> {
     try {
-      const response = await fetch(`${this.baseURL}/ingest`, {
+      const apiUrl = await this.getApiUrl();
+      const safeApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      const response = await fetch(`${safeApiUrl}/ingest`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,7 +245,9 @@ class AssistantAPI {
 
   async ingestDocuments(documents: DocumentInput[]): Promise<BatchIngestResponse> {
     try {
-      const response = await fetch(`${this.baseURL}/ingest/batch`, {
+      const apiUrl = await this.getApiUrl();
+      const safeApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      const response = await fetch(`${safeApiUrl}/ingest/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,7 +269,18 @@ class AssistantAPI {
 
   async getHealth(): Promise<HealthResponse> {
     const apiUrl = await this.getApiUrl();
-    const response = await axios.get(`${apiUrl}/health`, { timeout: 10000 });
+    const safeApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+    const response = await axios.get(`${safeApiUrl}/health`, { timeout: 10000 });
+    return response.data;
+  }
+
+  // Simple health check using the base URL directly (for debugging)
+  async getHealthDirect(): Promise<HealthResponse> {
+    console.log('getHealthDirect - using baseURL:', this.baseURL);
+    const response = await axios.get(this.joinUrl('/health'), {
+      timeout: 10000,
+      headers: { 'Content-Type': 'application/json' },
+    });
     return response.data;
   }
 
@@ -249,11 +290,12 @@ class AssistantAPI {
     total_count: number;
   }> {
     try {
+      const apiUrl = await this.getApiUrl();
       const params = new URLSearchParams();
       if (folderId) params.append('folder_id', folderId);
       params.append('max_results', maxResults.toString());
 
-      const response = await fetch(`${this.baseURL}/drive/files?${params}`, {
+      const response = await fetch(`${apiUrl}/drive/files?${params}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -277,7 +319,8 @@ class AssistantAPI {
     file: GoogleDriveInfo;
   }> {
     try {
-      const response = await fetch(`${this.baseURL}/drive/file/${fileId}`, {
+      const apiUrl = await this.getApiUrl();
+      const response = await fetch(`${apiUrl}/drive/file/${fileId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -301,7 +344,8 @@ class AssistantAPI {
     message: string;
   }> {
     try {
-      const response = await fetch(`${this.baseURL}/drive/file/${fileId}`, {
+      const apiUrl = await this.getApiUrl();
+      const response = await fetch(`${apiUrl}/drive/file/${fileId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
