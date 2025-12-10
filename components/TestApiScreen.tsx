@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import Constants from 'expo-constants';
-import AssistantAPI from '../services/api';
+import { assistantAPI } from '../services/api';
 
 const TestApiScreen = () => {
   const [result, setResult] = useState<string>('');
@@ -22,8 +22,7 @@ const TestApiScreen = () => {
   const testApi = async () => {
     setLoading(true);
     try {
-      const api = new AssistantAPI();
-      const response = await api.query({
+      const response = await assistantAPI.query({
         query: 'Hello, test message'
       });
       setResult(JSON.stringify(response, null, 2));
@@ -38,8 +37,7 @@ const TestApiScreen = () => {
   const testHealth = async () => {
     setLoading(true);
     try {
-      const api = new AssistantAPI();
-      const response = await api.getHealth();
+      const response = await assistantAPI.getHealth();
       setResult(JSON.stringify(response, null, 2));
     } catch (error) {
       setResult(`Error: ${error}`);

@@ -14,9 +14,10 @@ import {
 } from 'react-native';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
 import HealthModal from './HealthModal';
-import SpeechManager from './SpeechManager';
+import { useSpeech } from '../hooks/useSpeech';
 import SpeechGuide from './SpeechGuide';
-import { COLORS } from '../theme';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme';
+import { MaterialIcons } from '@expo/vector-icons';
 
 interface Message {
   id: string;
@@ -36,8 +37,14 @@ export default function ChatScreen() {
   const [isFormalTone, setIsFormalTone] = useState(false); // Start with casual tone
   const scrollViewRef = useRef<ScrollView>(null);
   
-  // Speech Manager Hook
-  const speechManager: any = (SpeechManager as any)({
+  const {
+    isListening,
+    isSpeaking,
+    isSupported,
+    startListening,
+    stopSpeaking,
+    speak
+  } = useSpeech({
     onSpeechResult: (text: string) => {
       setInputText(text);
     },
@@ -149,8 +156,8 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, assistantMessage]);
       
       // Speak the response if speech is enabled and supported
-      if (speechEnabled && speechManager?.isSupported && response.response) {
-        speechManager?.speak(response.response);
+      if (speechEnabled && isSupported && response.response) {
+        speak(response.response);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -163,8 +170,8 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, errorMessage]);
       
       // Speak error message if speech is enabled and supported
-      if (speechEnabled && speechManager?.isSupported) {
-        speechManager?.speak(isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?');
+      if (speechEnabled && isSupported) {
+        speak(isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?');
       }
     } finally {
       setIsLoading(false);
@@ -179,11 +186,11 @@ export default function ChatScreen() {
         message.isUser ? styles.userMessage : styles.assistantMessage,
       ]}
              onPress={() => {
-         if (speechEnabled && speechManager?.isSupported && !message.isUser) {
-           speechManager?.speak(message.content);
+         if (speechEnabled && isSupported && !message.isUser) {
+           speak(message.content);
          }
        }}
-       activeOpacity={message.isUser || !speechEnabled || !speechManager?.isSupported ? 1 : 0.7}
+       activeOpacity={message.isUser || !speechEnabled || !isSupported ? 1 : 0.7}
     >
       <Text style={[
         styles.messageText,
@@ -202,10 +209,10 @@ export default function ChatScreen() {
         </View>
       )}
               <View style={styles.messageFooter}>
-          <Text style={styles.timestamp}>
-            {message.timestamp.toLocaleTimeString()}
+          <Text style={[styles.timestamp, message.isUser ? { color: 'rgba(255,255,255,0.7)' } : {}]}>
+            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
-          {!message.isUser && speechEnabled && speechManager?.isSupported && (
+          {!message.isUser && speechEnabled && isSupported && (
             <Text style={styles.tapToSpeakHint}>
               {isFormalTone ? 'Tap to hear' : 'Tap to speak'}
             </Text>
@@ -217,7 +224,7 @@ export default function ChatScreen() {
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chat</Text>
+        <Text style={styles.headerTitle}>Assistant</Text>
         
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -225,13 +232,10 @@ export default function ChatScreen() {
             style={styles.statusContainer}
             activeOpacity={0.7}
           >
-            <View style={[
+             <View style={[
               styles.statusIndicator,
-              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+              { backgroundColor: isConnected ? COLORS.success : COLORS.error }
             ]} />
-            <Text style={styles.statusText}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -239,6 +243,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         style={styles.chatContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
@@ -247,20 +252,23 @@ export default function ChatScreen() {
         >
           {messages.length === 0 && (
             <View style={styles.welcomeContainer}>
+              <View style={styles.logoPlaceholder}>
+                <MaterialIcons name="smart-toy" size={64} color={COLORS.accent} />
+              </View>
               <Text style={styles.welcomeText}>
                 {isFormalTone 
-                  ? 'Greetings! I am your personal assistant. How may I be of assistance today?'
-                  : 'Welcome! I\'m your personal assistant. How can I help you today?'
+                  ? 'Greetings. How may I assist you today?'
+                  : 'Hey there! How can I help?'
                 }
               </Text>
               <Text style={styles.welcomeSubtext}>
                 {isFormalTone 
-                  ? (speechManager?.isSupported 
-                    ? "You may type or speak your messages."
-                    : "Please type your messages below.")
-                  : (speechManager?.isSupported 
-                    ? "You can type or speak your messages!"
-                    : "Type your messages below.")
+                  ? (isSupported 
+                    ? "Voice input available."
+                    : "Please type your query.")
+                  : (isSupported 
+                    ? "Tap the mic to speak!"
+                    : "Type a message to start.")
                 }
               </Text>
             </View>
@@ -270,65 +278,67 @@ export default function ChatScreen() {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={COLORS.accent} />
               <Text style={styles.loadingText}>
-                {isFormalTone ? 'Processing your request...' : 'Thinking...'}
+                {isFormalTone ? 'Processing...' : 'Thinking...'}
               </Text>
             </View>
           )}
         </ScrollView>
 
-        <View style={styles.inputContainer}>
-          <View style={styles.inputRow}>
+        <View style={styles.inputWrapper}>
+          <View style={styles.inputContainer}>
             <TextInput
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder={isFormalTone ? "Type here..." : "Type here..."}
+              placeholder={isFormalTone ? "Enter message..." : "Type a message..."}
+              placeholderTextColor={COLORS.textSecondary}
               multiline
               maxLength={1000}
               editable={!isLoading}
             />
-            {speechManager?.isSupported && (
+            {isSupported && (
               <TouchableOpacity
                 style={[
-                  styles.voiceButton,
-                  speechManager?.isListening && styles.voiceButtonActive
+                  styles.iconButton,
+                  isListening && styles.iconButtonActive
                 ]}
-                onPress={speechManager?.startListening}
-                disabled={isLoading || speechManager?.isSpeaking}
+                onPress={startListening}
+                disabled={isLoading || isSpeaking}
               >
-                <Text style={styles.voiceButtonText}>
-                  {speechManager?.isListening ? '🎤' : '🎙️'}
-                </Text>
+                <MaterialIcons 
+                  name={isListening ? "mic" : "mic-none"} 
+                  size={24} 
+                  color={isListening ? COLORS.textInverse : COLORS.accent} 
+                />
               </TouchableOpacity>
             )}
             <TouchableOpacity
               style={[
-                styles.sendButton,
-                (!inputText.trim() || isLoading) && styles.sendButtonDisabled
+                styles.iconButton,
+                (!inputText.trim() || isLoading) && styles.iconButtonDisabled,
+                { backgroundColor: (!inputText.trim() || isLoading) ? 'transparent' : COLORS.accent }
               ]}
               onPress={sendMessage}
               disabled={!inputText.trim() || isLoading}
             >
-              <Text style={[
-                styles.sendButtonText,
-                (!inputText.trim() || isLoading) && styles.sendButtonTextDisabled
-              ]}>
-                {isFormalTone ? 'Submit' : 'Send'}
-              </Text>
+              <MaterialIcons 
+                name="send" 
+                size={24} 
+                color={(!inputText.trim() || isLoading) ? COLORS.disabled : COLORS.textInverse} 
+              />
             </TouchableOpacity>
           </View>
-          {speechManager?.isSpeaking && (
+          
+          {isSpeaking && (
             <View style={styles.speechStatusContainer}>
               <Text style={styles.speechStatusText}>
-                🔊 {isFormalTone ? 'Speaking...' : 'Speaking...'}
+                🔊 Speaking...
               </Text>
               <TouchableOpacity
                 style={styles.stopSpeechButton}
-                onPress={speechManager?.stopSpeaking}
+                onPress={stopSpeaking}
               >
-                <Text style={styles.stopSpeechText}>
-                  {isFormalTone ? 'Cease' : 'Stop'}
-                </Text>
+                <Text style={styles.stopSpeechText}>Stop</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -353,40 +363,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: SPACING.l,
+    paddingTop: Platform.OS === 'ios' ? 60 : SPACING.m, // Adjust for status bar
+    paddingBottom: SPACING.m,
     backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.accent,
+    zIndex: 10,
+    ...SHADOWS.medium,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: COLORS.textPrimary,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: SPACING.s,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
+    padding: SPACING.s,
+    borderRadius: RADIUS.round,
+    backgroundColor: COLORS.surfaceHighlight,
   },
   statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
+    width: 10,
+    height: 10,
+    borderRadius: RADIUS.round,
   },
   chatContainer: {
     flex: 1,
@@ -395,175 +398,175 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
-    padding: 16,
+    padding: SPACING.m,
+    paddingBottom: SPACING.xl,
   },
   welcomeContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
+    opacity: 0.8,
+  },
+  logoPlaceholder: {
+    marginBottom: SPACING.l,
+    padding: SPACING.l,
+    borderRadius: RADIUS.round,
+    backgroundColor: COLORS.surfaceHighlight,
+    ...SHADOWS.glow,
   },
   welcomeText: {
-    fontSize: 16,
+    fontSize: 18,
     color: COLORS.textPrimary,
     textAlign: 'center',
-    lineHeight: 24,
+    marginBottom: SPACING.s,
+    fontWeight: '600',
   },
   welcomeSubtext: {
-    fontSize: 12,
+    fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
   },
   messageContainer: {
-    marginVertical: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    maxWidth: '80%',
+    marginVertical: 4,
+    paddingHorizontal: SPACING.m,
+    paddingVertical: SPACING.s + 4,
+    borderRadius: RADIUS.xl,
+    maxWidth: '85%',
+    ...SHADOWS.small,
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary, // Using primary color for user
+    borderBottomRightRadius: RADIUS.s,
   },
   assistantMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.surfaceHighlight,
+    borderBottomLeftRadius: RADIUS.s,
   },
   messageText: {
     fontSize: 16,
     lineHeight: 22,
+    color: COLORS.textPrimary,
   },
   userMessageText: {
-    color: COLORS.background,
+    color: COLORS.textInverse, // Text on primary color
   },
   assistantMessageText: {
     color: COLORS.textPrimary,
   },
   sourcesContainer: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: SPACING.s,
+    paddingTop: SPACING.s,
     borderTopWidth: 1,
-    borderTopColor: COLORS.accent,
+    borderTopColor: 'rgba(255,255,255,0.1)',
   },
   sourcesLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
   },
   sourceText: {
-    fontSize: 11,
-    color: COLORS.textPrimary,
+    fontSize: 10,
+    color: COLORS.textSecondary,
     marginBottom: 2,
   },
   messageFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end', // Align timestamp to right
     alignItems: 'center',
     marginTop: 4,
+    gap: 8,
   },
   timestamp: {
     fontSize: 10,
     color: COLORS.textSecondary,
+    opacity: 0.7,
   },
   tapToSpeakHint: {
-    fontSize: 9,
+    fontSize: 10,
     color: COLORS.accent,
     fontStyle: 'italic',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'center',
+    paddingVertical: SPACING.m,
   },
   loadingText: {
-    marginLeft: 8,
+    marginLeft: SPACING.s,
     fontSize: 14,
-    color: COLORS.textPrimary,
+    color: COLORS.textSecondary,
+  },
+  inputWrapper: {
+    padding: SPACING.m,
+    backgroundColor: 'transparent', // Match background so it blends
+    marginBottom: 80, // Space for tab bar
   },
   inputContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.accent,
-  },
-  inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    paddingHorizontal: SPACING.s,
+    paddingVertical: SPACING.xs,
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.large,
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 8,
-    maxHeight: 100,
+    paddingHorizontal: SPACING.m,
+    paddingVertical: SPACING.s, // Center vertically
+    paddingTop: SPACING.s + 2, // Ensure text is centered
+    paddingBottom: SPACING.s + 2,
     fontSize: 16,
     color: COLORS.textPrimary,
+    maxHeight: 120,
   },
-  voiceButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.surface,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.round,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
+    marginBottom: 5, // Align with bottom of input text
+    marginLeft: 4,
   },
-  voiceButtonActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+  iconButtonActive: {
+    backgroundColor: COLORS.error,
   },
-  voiceButtonText: {
-    fontSize: 18,
+  iconButtonDisabled: {
+    opacity: 0.5,
   },
   speechStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.surface,
-    borderRadius: 8,
+    marginTop: SPACING.s,
+    paddingHorizontal: SPACING.m,
+    paddingVertical: SPACING.s,
+    backgroundColor: COLORS.surfaceHighlight,
+    borderRadius: RADIUS.m,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   speechStatusText: {
     fontSize: 14,
-    color: COLORS.textPrimary,
+    color: COLORS.accent,
+    fontWeight: '600',
   },
   stopSpeechButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: COLORS.accent,
-    borderRadius: 4,
+    paddingHorizontal: SPACING.m,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: RADIUS.s,
   },
   stopSpeechText: {
-    color: COLORS.background,
+    color: COLORS.textPrimary,
     fontSize: 12,
     fontWeight: '500',
   },
-  sendButton: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
-  sendButtonDisabled: {
-    backgroundColor: COLORS.disabled,
-  },
-  sendButtonText: {
-    color: COLORS.background,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  sendButtonTextDisabled: {
-    color: COLORS.textSecondary,
-  },
-}); 
+});

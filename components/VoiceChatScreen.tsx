@@ -14,10 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { assistantAPI, QueryRequest, QueryResponse } from '../services/api';
 import SpeechManager from './SpeechManager';
-import VoiceVisualizer from './VoiceVisualizer';
 import HealthModal from './HealthModal';
 import * as ExpoSpeech from 'expo-speech';
-import { COLORS } from '../theme';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../theme';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface Message {
@@ -34,32 +33,21 @@ export default function VoiceChatScreen() {
   const [isConnected, setIsConnected] = useState(false);
   const [healthModalVisible, setHealthModalVisible] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
-  const [isFormalTone, setIsFormalTone] = useState(false); // Start with casual tone
-  const scrollViewRef = useRef<ScrollView>(null);
-  const showMessages = false;
+  const [isFormalTone, setIsFormalTone] = useState(false);
   
+  // Note: SpeechManager handles its own speech state internally but we might want to sync it here
+  // or pass props. For now, we trust SpeechManager's internal state for listening.
+
   useEffect(() => {
     checkAPIHealth();
   }, []);
 
-  // PanResponder for two-finger swipe gesture
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to two-finger gestures
-        return evt.nativeEvent.touches.length === 2;
-      },
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return evt.nativeEvent.touches.length === 2;
-      },
-      onPanResponderGrant: () => {
-        // Gesture started
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        // Track movement for swipe detection
-      },
+      onStartShouldSetPanResponder: () => false, // Disable for now to avoid interfering with buttons
+      onMoveShouldSetPanResponder: () => false,
+      // Keeping logic for future use if needed
       onPanResponderRelease: (evt, gestureState) => {
-        // Check if it was a horizontal swipe
         if (Math.abs(gestureState.dx) > 50) {
           setIsFormalTone(prev => !prev);
         }
@@ -76,14 +64,10 @@ export default function VoiceChatScreen() {
       Alert.alert(
         'Connection Error',
         isFormalTone 
-          ? 'Unable to establish connection with the server. Please ensure the server is operational.'
-          : 'Can\'t connect to the server. Make sure it\'s running!'
+          ? 'Unable to establish connection with the server.'
+          : 'Can\'t connect to the server.'
       );
     }
-  };
-
-  const handleStatusIndicatorPress = () => {
-    setHealthModalVisible(true);
   };
 
   const handleSpeechResult = async (text: string) => {
@@ -116,8 +100,12 @@ export default function VoiceChatScreen() {
 
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Speak the response if speech is enabled
       if (speechEnabled && response.response) {
+        // We use the imported ExpoSpeech directly here as VoiceChatScreen logic
+        // But ideally we should use the same hook. 
+        // For consistency with previous implementation, we keep using ExpoSpeech directly here
+        // or rely on SpeechManager if it had exposure.
+        // The previous code used ExpoSpeech.speak directly here.
         await ExpoSpeech.speak(response.response, {
           language: 'en-US',
           pitch: 1.0,
@@ -128,15 +116,14 @@ export default function VoiceChatScreen() {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?',
+        content: isFormalTone ? 'An error has occurred.' : 'Oops! Something went wrong.',
         isUser: false,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
       
-      // Speak error message if speech is enabled
       if (speechEnabled) {
-        await ExpoSpeech.speak(isFormalTone ? 'An error has occurred. Please attempt your request again.' : 'Oops! Something went wrong. Mind trying again?', {
+        await ExpoSpeech.speak(isFormalTone ? 'An error has occurred.' : 'Oops! Something went wrong.', {
           language: 'en-US',
           pitch: 1.0,
           rate: 0.75,
@@ -147,151 +134,85 @@ export default function VoiceChatScreen() {
     }
   };
 
-  const handleMessagePress = async (message: Message) => {
-    if (speechEnabled && !message.isUser) {
-      await ExpoSpeech.speak(message.content, {
-        language: 'en-US',
-        pitch: 1.0,
-        rate: 0.75,
-      });
-    }
-  };
-
-  const renderMessage = (message: Message) => (
-    <TouchableOpacity
-      key={message.id}
-      style={[
-        styles.messageContainer,
-        message.isUser ? styles.userMessage : styles.assistantMessage,
-      ]}
-      onPress={() => handleMessagePress(message)}
-      activeOpacity={message.isUser || !speechEnabled ? 1 : 0.7}
-    >
-      <Text style={[
-        styles.messageText,
-        message.isUser ? styles.userMessageText : styles.assistantMessageText,
-      ]}>
-        {message.content}
-      </Text>
-      {message.sources && message.sources.length > 0 && (
-        <View style={styles.sourcesContainer}>
-          <Text style={styles.sourcesLabel}>Sources:</Text>
-          {message.sources.map((source, index) => (
-            <Text key={index} style={styles.sourceText}>
-              • {source.title || source.url || 'Unknown source'}
-            </Text>
-          ))}
-        </View>
-      )}
-      <View style={styles.messageFooter}>
-        <Text style={styles.timestamp}>
-          {message.timestamp.toLocaleTimeString()}
-        </Text>
-        {!message.isUser && speechEnabled && (
-          <Text style={styles.tapToSpeakHint}>
-            {isFormalTone ? 'Tap to hear' : 'Tap to speak'}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
   return (
-    <SafeAreaView style={styles.container} {...panResponder.panHandlers}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Voice Chat</Text>
+        <Text style={styles.headerTitle}>Voice Mode</Text>
         
         <View style={styles.headerActions}>
           <TouchableOpacity
             onPress={() => setSpeechEnabled(!speechEnabled)}
-            style={[styles.headerButton]}
+            style={styles.headerButton}
             activeOpacity={0.7}
           >
             <MaterialIcons
               name={speechEnabled ? 'volume-up' : 'volume-off'}
               size={20}
-              color={speechEnabled ? COLORS.accent : COLORS.textSecondary}
+              color={speechEnabled ? COLORS.textInverse : COLORS.textSecondary}
             />
           </TouchableOpacity>
 
-          {/* Gear icon for HealthModal */}
           <TouchableOpacity
             onPress={() => setHealthModalVisible(true)}
-            style={[styles.headerButton, { marginLeft: 8 }]}
+            style={[styles.headerButton, { marginLeft: SPACING.s }]}
             activeOpacity={0.7}
           >
             <MaterialIcons
               name="settings"
-              size={22}
-              color={COLORS.accent}
+              size={20}
+              color={COLORS.textPrimary}
             />
           </TouchableOpacity>
           
-          <TouchableOpacity
-            onPress={handleStatusIndicatorPress}
-            style={styles.statusContainer}
-            activeOpacity={0.7}
-          >
-            <View style={[
-              styles.statusIndicator,
-              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-            ]} />
-            <Text style={styles.statusText}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </Text>
-          </TouchableOpacity>
+          <View style={[styles.statusDot, { backgroundColor: isConnected ? COLORS.success : COLORS.error }]} />
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.mainContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Main Voice Interface */}
-        <View style={[styles.voiceContainer, { flex: 1 }]}>
-          {messages.length === 0 && (
-            <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeText}>
-                {isFormalTone ? 'Welcome! Ready to begin our conversation?' : 'Hey there! Ready to chat?'}
-              </Text>
-              <Text style={styles.welcomeSubtext}>
-                {isFormalTone 
-                  ? 'Please hold down the microphone button and commence speaking. Utilize the volume control above to manage speech output.'
-                  : 'Just hold down the mic button and start talking. Use the volume button up top to toggle speech output.'
-                }
-              </Text>
-            </View>
-          )}
+      <View style={styles.contentContainer}>
+        {messages.length === 0 ? (
+          <View style={styles.welcomeContainer}>
+            <MaterialIcons name="graphic-eq" size={80} color={COLORS.surfaceHighlight} style={{ marginBottom: SPACING.l }} />
+            <Text style={styles.welcomeText}>
+              {isFormalTone ? 'Ready for conversation' : 'Ready to chat'}
+            </Text>
+            <Text style={styles.welcomeSubtext}>
+              Tap and hold the button below to speak
+            </Text>
+          </View>
+        ) : (
+          <ScrollView 
+            style={styles.transcriptContainer}
+            contentContainerStyle={styles.transcriptContent}
+          >
+             {/* Only show the last few messages for context in Voice Mode */}
+             {messages.slice(-2).map((msg) => (
+               <View key={msg.id} style={[
+                 styles.messageBubble,
+                 msg.isUser ? styles.userBubble : styles.assistantBubble
+               ]}>
+                 <Text style={[
+                   styles.messageText,
+                   msg.isUser ? styles.userText : styles.assistantText
+                 ]}>
+                   {msg.content}
+                 </Text>
+               </View>
+             ))}
+          </ScrollView>
+        )}
 
-          <SpeechManager
-            onSpeechResult={handleSpeechResult}
-            onSpeechStart={() => console.log('Speech started')}
-            onSpeechEnd={() => console.log('Speech ended')}
-          />
-
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
-              <Text style={styles.loadingText}>
-                {isFormalTone ? 'Processing your request...' : 'Thinking...'}
-              </Text>
-            </View>
-          )}
-
-          {/* Show last assistant response */}
-          {messages.length > 0 && (
-            <View style={styles.lastResponseContainer}>
-              {messages.slice(-1).map(message => 
-                !message.isUser ? (
-                  <View key={message.id} style={styles.lastResponse}>
-                    <Text style={styles.lastResponseText}>{message.content}</Text>
-                  </View>
-                ) : null
-              )}
-            </View>
+        <View style={styles.controlsContainer}>
+          {isLoading ? (
+            <ActivityIndicator size="large" color={COLORS.accent} style={{ marginBottom: SPACING.xl }} />
+          ) : (
+            <SpeechManager
+              onSpeechResult={handleSpeechResult}
+              onSpeechStart={() => console.log('Speech started')}
+              onSpeechEnd={() => console.log('Speech ended')}
+            />
           )}
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <HealthModal
         visible={healthModalVisible}
@@ -311,187 +232,96 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.accent,
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.m,
+    backgroundColor: COLORS.surface,
+    zIndex: 10,
+    ...SHADOWS.medium,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.accent,
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
   },
   headerButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.surface,
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.round,
+    backgroundColor: COLORS.surfaceHighlight,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
   },
-  disabledButton: {
-    backgroundColor: '#f0f0f0',
-    borderColor: '#d0d0d0',
-    opacity: 0.6,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: RADIUS.round,
+    marginLeft: SPACING.m,
   },
-  headerButtonText: {
-    fontSize: 16,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.accent,
-  },
-  mainContainer: {
+  contentContainer: {
     flex: 1,
-  },
-  voiceContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.background,
+    justifyContent: 'space-between',
+    paddingBottom: 100, // Extra padding for floating tab bar
   },
   welcomeContainer: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: 20,
-    marginBottom: 20,
-    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    opacity: 0.7,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    textAlign: 'center',
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.s,
   },
   welcomeSubtext: {
-    fontSize: 16,
-    color: COLORS.accent,
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 20,
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: COLORS.accent,
-  },
-  lastResponseContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    maxHeight: 150,
-  },
-  lastResponse: {
-    backgroundColor: COLORS.surface,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  lastResponseText: {
-    fontSize: 16,
-    color: COLORS.accent,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  messagesPanel: {
-    flex: 0.5,
-    backgroundColor: COLORS.background,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.accent,
-  },
-  messagesContainer: {
+  transcriptContainer: {
     flex: 1,
+    maxHeight: '60%',
   },
-  messagesContent: {
-    padding: 16,
-    backgroundColor: COLORS.background,
+  transcriptContent: {
+    padding: SPACING.l,
+    justifyContent: 'flex-end',
+    flexGrow: 1,
   },
-  messageContainer: {
-    marginVertical: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    maxWidth: '80%',
+  messageBubble: {
+    padding: SPACING.m,
+    borderRadius: RADIUS.xl,
+    marginBottom: SPACING.m,
+    maxWidth: '90%',
+    ...SHADOWS.small,
   },
-  userMessage: {
+  userBubble: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignSelf: 'flex-end',
-    backgroundColor: COLORS.accent,
+    borderBottomRightRadius: RADIUS.s,
   },
-  assistantMessage: {
+  assistantBubble: {
+    backgroundColor: COLORS.surfaceHighlight,
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderBottomLeftRadius: RADIUS.s,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '500',
   },
-  userMessageText: {
-    color: COLORS.background,
+  userText: {
+    color: COLORS.textSecondary,
   },
-  assistantMessageText: {
-    color: COLORS.accent,
+  assistantText: {
+    color: COLORS.textPrimary,
   },
-  sourcesContainer: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  sourcesLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 4,
-  },
-  sourceText: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 2,
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  controlsContainer: {
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
+    minHeight: 200,
   },
-  timestamp: {
-    fontSize: 10,
-    color: '#999',
-  },
-  tapToSpeakHint: {
-    fontSize: 9,
-    color: '#007AFF',
-    fontStyle: 'italic',
-  },
-}); 
+});

@@ -97,6 +97,15 @@ export interface BatchIngestResponse {
   batch_info: BatchInfo;
 }
 
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  data?: any;
+}
+
 class AssistantAPI {
   private client: AxiosInstance;
   private baseURL: string;
@@ -363,6 +372,56 @@ class AssistantAPI {
       throw error;
     }
   }
+
+  async getNotifications(): Promise<{
+    status: string;
+    count: number;
+    notifications: Notification[];
+  }> {
+    try {
+      const apiUrl = await this.getApiUrl();
+      const safeApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      const response = await fetch(`${safeApiUrl}/notifications`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Get Notifications:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationRead(notificationId: string): Promise<{ status: string }> {
+    try {
+      const apiUrl = await this.getApiUrl();
+      const safeApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      const response = await fetch(`${safeApiUrl}/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Mark Notification Read:', error);
+      throw error;
+    }
+  }
 }
 
-export const assistantAPI = new AssistantAPI(); 
+export const assistantAPI = new AssistantAPI();
