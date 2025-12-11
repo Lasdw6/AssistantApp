@@ -33,7 +33,7 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [healthModalVisible, setHealthModalVisible] = useState(false);
-  const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
   const [isFormalTone, setIsFormalTone] = useState(false); // Start with casual tone
   const scrollViewRef = useRef<ScrollView>(null);
   
@@ -228,6 +228,18 @@ export default function ChatScreen() {
         
         <View style={styles.headerActions}>
           <TouchableOpacity
+            onPress={() => setSpeechEnabled(!speechEnabled)}
+            style={styles.headerButton}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name={speechEnabled ? 'volume-up' : 'volume-off'}
+              size={20}
+              color={speechEnabled ? COLORS.textPrimary : COLORS.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
             onPress={handleStatusIndicatorPress}
             style={styles.statusContainer}
             activeOpacity={0.7}
@@ -380,6 +392,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.s,
+  },
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.round,
+    backgroundColor: COLORS.surfaceHighlight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusContainer: {
     padding: SPACING.s,

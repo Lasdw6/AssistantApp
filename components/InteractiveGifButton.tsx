@@ -2,11 +2,11 @@ import React, { useState, useRef } from 'react';
 import { 
   View, 
   TouchableOpacity, 
-  Image, 
   StyleSheet, 
   Animated, 
   Text 
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS } from '../theme';
 
 interface InteractiveGifButtonProps {
@@ -108,18 +108,21 @@ const InteractiveGifButton: React.FC<InteractiveGifButtonProps> = ({
           ]}
           activeOpacity={1}
         >
-          <Image
-            source={require('../assets/download.gif')}
-            style={[
-              styles.gifImage,
-              {
-                width: size * 0.9,
-                height: size * 0.9,
-                borderRadius: size * 0.45,
-              },
-            ]}
-            resizeMode="contain"
-          />
+          <View style={[
+            styles.innerCircle,
+            {
+              width: size * 0.9,
+              height: size * 0.9,
+              borderRadius: size * 0.45,
+              backgroundColor: isListening ? COLORS.primary : COLORS.surfaceHighlight,
+            }
+          ]}>
+            <MaterialIcons
+              name={isListening ? "graphic-eq" : "mic"}
+              size={size * 0.4}
+              color={isListening ? COLORS.textInverse : COLORS.textPrimary}
+            />
+          </View>
 
           {/* Overlay for listening state */}
           {isListening && (
@@ -211,8 +214,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  gifImage: {
-    backgroundColor: 'transparent',
+  innerCircle: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listeningOverlay: {
     position: 'absolute',
